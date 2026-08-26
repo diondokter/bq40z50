@@ -491,8 +491,7 @@ impl<I2C: I2cTrait, DELAY: DelayTrait> DeviceInterface<I2C, DELAY> {
         use_pec: bool,
     ) -> Result<(), BQ40Z50Error<I2C::Error>> {
         let mut write_buf = [0u8; 1 + LARGEST_REG_SIZE_BYTES + 6];
-        let write_buf_ref: &[u8];
-        if use_pec {
+        let write_buf_ref: &[u8] = if use_pec {
             let mut pec = smbus_pec::Pec::default();
             // Device Addr + Write Bit (0)
             pec.write_u8(BQ_ADDR << 1);
@@ -503,10 +502,10 @@ impl<I2C: I2cTrait, DELAY: DelayTrait> DeviceInterface<I2C, DELAY> {
             write_buf[write.len()] = pec.finish().try_into().unwrap();
 
             // Include everything we want to write plus the PEC byte
-            write_buf_ref = &write_buf[..=write.len()];
+            &write_buf[..=write.len()]
         } else {
-            write_buf_ref = write;
-        }
+            write
+        };
         self.write_with_retries_internal(write_buf_ref).await
     }
 
@@ -580,8 +579,8 @@ impl<I2C: I2cTrait, DELAY: DelayTrait> DeviceInterface<I2C, DELAY> {
         &mut self,
         write: &[u8],
         read: &mut [u8],
-        use_pec: bool,
     ) -> Result<(), BQ40Z50Error<I2C::Error>> {
+        let use_pec = self.config.pec_read;
         let mut retries = self.config.max_bus_retries;
         // Read buffer with one extra space at the end, in case we use PEC
         // Response looks like [ Length (1 byte) | Command (2 bytes) | Data (output.len() bytes)]
